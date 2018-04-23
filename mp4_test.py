@@ -149,10 +149,10 @@ class MP4(unittest.TestCase):
 
         dt = timedelta(seconds=5)
         now = datetime(2016, 10, 12, 23, 59, 59).replace(tzinfo=pytz.timezone("EST"))
-        ancient = NewsStory('', '', '', '', datetime(1987, 10, 15)).replace(tzinfo=pytz.timezone("EST"))
+        ancient = NewsStory('', '', '', '', datetime(1987, 10, 15).replace(tzinfo=pytz.timezone("EST")))
         just_now = NewsStory('', '', '', '', now - dt)
         in_a_bit = NewsStory('', '', '', '', now + dt)
-        future = NewsStory('', '', '', '', datetime(2087, 10, 15)).replace(tzinfo=pytz.timezone("EST"))
+        future = NewsStory('', '', '', '', datetime(2087, 10, 15).replace(tzinfo=pytz.timezone("EST")))
 
         s1 = BeforeTrigger('12 Oct 2016 23:59:59')
         s2 = AfterTrigger('12 Oct 2016 23:59:59')

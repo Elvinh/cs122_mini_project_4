@@ -1,3 +1,10 @@
+'''
+Edited by Elton Vinh
+CS 122
+Nooshin Tajik
+April 2018
+'''
+
 import feedparser
 import string
 import time
@@ -6,6 +13,7 @@ from project_util import translate_html
 from mtTkinter import *
 from datetime import datetime
 import pytz
+import re
 
 
 #-----------------------------------------------------------------------
@@ -48,8 +56,30 @@ def process(url):
 #======================
 
 # Part 1
+class NewsStory(object):
 
-# TODO: NewsStory
+    def __init__(self, guid, title, description, link, pubdate):
+        self.guid = guid
+        self.title = title
+        self.description = description
+        self.link = link
+        self.pubdate = pubdate
+
+    def get_guid(self):
+        return self.guid
+
+    def get_title(self):
+        return self.title
+
+    def get_description(self):
+        return self.description
+
+    def get_link(self):
+        return self.link
+
+    def get_pubdate(self):
+        return self.pubdate
+
 
 
 #======================
@@ -68,37 +98,85 @@ class Trigger(object):
 # PHRASE TRIGGERS
 
 # Part 2
-# TODO: PhraseTrigger
+class PhraseTrigger(Trigger):
+    def __init__(self, phrase):
+        self.phrase = phrase
+
+    def evaluate(self, story):
+        raise NotImplementedError
+
+    def is_phrase_in(self, text):
+        #  Remove punctuation
+        s = re.sub(r'[^\w\s]', ' ', text)
+        #  Remove multiple spaces between words
+        s = re.sub(' +',' ', s)
+
+        result = re.findall('\\b' + self.phrase + '\\b', s, flags=re.IGNORECASE)
+        if len(result) > 0:
+            return True
+        else:
+            return False
 
 # Part 3
-# TODO: TitleTrigger
+class TitleTrigger(PhraseTrigger):
+    def evaluate(self, story):
+        return self.is_phrase_in(story.title)
 
 # Part 4
-# TODO: DescriptionTrigger
+class DescriptionTrigger(PhraseTrigger):
+    def evaluate(self, story):
+        return self.is_phrase_in(story.description)
 
 # TIME TRIGGERS
 
 # Part 5
-# TODO: TimeTrigger
 # Constructor:
 #        Input: Time has to be in EST and in the format of "%d %b %Y %H:%M:%S".
 #        Convert time from string to a datetime before saving it as an attribute.
+class TimeTrigger(Trigger):
+    def __init__(self, time):
+        self.time = datetime.strptime(time, "%d %b %Y %H:%M:%S")
+        self.time = self.time.replace(tzinfo=pytz.timezone("EST"))
+
+    def evaluate(self, story):
+        pass
 
 # Part 6
-# TODO: BeforeTrigger and AfterTrigger
+class BeforeTrigger(TimeTrigger):
+    def evaluate(self, story):
+        return self.time > story.pubdate.replace(tzinfo=pytz.timezone("EST"))
 
+class AfterTrigger(TimeTrigger):
+    def evaluate(self, story):
+        return self.time < story.pubdate.replace(tzinfo=pytz.timezone("EST"))
 
 # COMPOSITE TRIGGERS
 
 # Part 7
-# TODO: NotTrigger
+class NotTrigger(Trigger):
+    def __init__(self, trigger):
+        self.trigger = trigger
+
+    def evaluate(self, story):
+        return not self.trigger.evaluate(story);
 
 # Part 8
-# TODO: AndTrigger
+class AndTrigger(Trigger):
+    def __init__(self, trigger1, trigger2):
+        self.trigger1 = trigger1
+        self.trigger2 = trigger2
+
+    def evaluate(self, story):
+        return self.trigger1.evaluate(story) and self.trigger2.evaluate(story);
 
 # Part 9
-# TODO: OrTrigger
+class OrTrigger(Trigger):
+    def __init__(self, trigger1, trigger2):
+        self.trigger1 = trigger1
+        self.trigger2 = trigger2
 
+    def evaluate(self, story):
+        return self.trigger1.evaluate(story) or self.trigger2.evaluate(story);
 
 #======================
 # Filtering
@@ -111,10 +189,15 @@ def filter_stories(stories, triggerlist):
 
     Returns: a list of only the stories for which a trigger in triggerlist fires.
     """
-    # TODO: Problem 10
-    # This is a placeholder
-    # (we're just returning all the stories, with no filtering)
-    return stories
+    validStories = []
+    for story in stories:
+        isValid = False
+        for trigger in triggerlist:
+            if trigger.evaluate(story):
+                isValid = True
+        if isValid:
+            validStories.append(story)
+    return validStories
 
 #======================
 # User-Specified Triggers
@@ -136,27 +219,58 @@ def read_trigger_config(filename):
         if not (len(line) == 0 or line.startswith('//')):
             lines.append(line)
 
-# TODO: part 11
-# line is the list of lines that you need to parse and for which you need
-# to build triggers
+    # line is the list of lines that you need to parse and for which you need
+    # to build triggers
 
-print(lines) # for now, print it so you see what it contains!
+    print(lines) # for now, print it so you see what it contains!
+    triggerlist = []
+    triggDict = {}
+    for line in lines:
+        trigger = line.split(',')
+        if trigger[0] == 'ADD':
+            for tr in trigger[1:]:
+                triggerlist.append(triggDict[tr])
+        else:
+            if trigger[1] == 'TITLE':
+                trig = TitleTrigger(trigger[2])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'DESCRIPTION':
+                trig = DescriptionTrigger(trigger[2])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'AFTER':
+                trig = AfterTrigger(trigger[2])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'BEFORE':
+                trig = BeforeTrigger(trigger[2])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'NOT':
+                trig = NotTrigger(triggDict[trigger[2]], triggDict[trigger[3]])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'AND':
+                trig = AndTrigger(triggDict[trigger[2]], triggDict[trigger[3]])
+                triggDict[trigger[0]] = trig
+            elif trigger[1] == 'OR':
+                trig = OrTrigger(triggDict[trigger[2]], triggDict[trigger[3]])
+                triggDict[trigger[0]] = trig
 
-SLEEPTIME = 120 #seconds -- how often we poll
+    return triggerlist
+
+
+SLEEPTIME = 120  # seconds -- how often we poll
+
 
 def main_thread(master):
     # A sample trigger list - you might need to change the phrases to correspond
     # to what is currently in the news
     try:
-        t1 = TitleTrigger("election")
-        t2 = DescriptionTrigger("Trump")
-        t3 = DescriptionTrigger("Clinton")
+        t1 = TitleTrigger("Trump")
+        t2 = DescriptionTrigger("north korea")
+        t3 = DescriptionTrigger("nuclear")
         t4 = AndTrigger(t2, t3)
         triggerlist = [t1, t4]
         
         # part 11
-        # TODO: After implementing read_trigger_config, uncomment this line
-        # triggerlist = read_trigger_config('triggers.txt')
+        triggerlist = read_trigger_config('triggers.txt')
         
         # HELPER CODE - you don't need to understand this!
         # Draws the popup window that displays the filtered stories
@@ -203,8 +317,8 @@ def main_thread(master):
             print("Sleeping...")
             time.sleep(SLEEPTIME)
 
-except Exception as e:
-    print(e)
+    except Exception as e:
+        print(e)
 
 
 if __name__ == '__main__':
